@@ -2,6 +2,7 @@ from django.http import JsonResponse
 from django.templatetags.static import static
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
+from rest_framework import serializers
 from rest_framework import status
 
 from .models import Product
@@ -63,49 +64,63 @@ def product_list_api(request):
 
 @api_view(['POST'])
 def register_order(request):
-    json_data = request.data
-    products = json_data.get('products')
-    first_name = json_data.get('firstname')
-    last_name = json_data.get('lastname')
-    address = json_data.get('address')
-    phone_number = json_data.get('phonenumber')
-
-    if products is None:
-            return Response(
-                {'error': 'products: Обязательное поле'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-    if not isinstance(products, list):
-            return Response(
-                {'error': 'Ожидался list со значениями, но был получен str.'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    
-    if len(products) == 0:
-            return Response(
-            {'error': 'products: Этот список не может быть пустым'}, 
-            status=status.HTTP_400_BAD_REQUEST
+    # json_data = request.data
+    # products = json_data.get('products')
+    # first_name = json_data.get('firstname')
+    # last_name = json_data.get('lastname')
+    # address = json_data.get('address')
+    # phone_number = json_data.get('phonenumber')
+    serializer = OrderSerializer(data=request.data)
+    if serializer.is_valid():
+        order = Order(
+            first_name=serializer.validated_data['firstname'],
+            last_name=serializer.validated_data['lastname'],
+            address=serializer.validated_data['address'],
+            phone_number=serializer.validated_data['phonenumber'],
         )
-
-    if not products:
+        order.save()
+        for product in serializer.validated_data['products']:
+            OrderItem.objects.create(
+                order=order,
+                product_id=product['product'],
+                quantity=product['quantity'],
+            )
         return Response(
-            {'error': 'Это поле не может быть пустым'}, 
-            status=status.HTTP_400_BAD_REQUEST
+            OrderResponseSerializer(order).data,
+            status=status.HTTP_201_CREATED
         )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    order = Order(
-        first_name=first_name,
-        last_name=last_name,
-        address=address,
-        phone_number=phone_number,
+
+class OrderSerializer(serializers.Serializer):
+    products = serializers.ListField(
+        child=serializers.DictField(),
+        allow_empty=False,
+        error_messages={
+            'required': 'products: Обязательное поле',
+            'empty': 'products: Этот список не может быть пустым',
+        },
+        write_only=True
     )
-    order.save()
+    firstname = serializers.CharField(
+        required=True,
+        error_messages={'required': 'first_name: Обязательное поле'}
+    )
+    lastname = serializers.CharField(
+        required=True,
+        error_messages={'required': 'last_name: Обязательное поле'}
+    )
+    phonenumber = serializers.CharField(
+        required=True,
+        error_messages={'required': 'phone_number: Обязательное поле'}
+    )
+    address = serializers.CharField(
+        required=True,
+        error_messages={'required': 'address: Обязательное поле'}
+    )
 
-    for product in products:
-        OrderItem.objects.create(
-            order_id=order.id,
-            product_id=product.get('product'),
-            quantity=product.get('quantity'),
-        )
-    return Response()
+
+class OrderResponseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ['id', 'first_name', 'last_name', 'phone_number', 'address']
