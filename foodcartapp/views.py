@@ -64,12 +64,6 @@ def product_list_api(request):
 
 @api_view(['POST'])
 def register_order(request):
-    # json_data = request.data
-    # products = json_data.get('products')
-    # first_name = json_data.get('firstname')
-    # last_name = json_data.get('lastname')
-    # address = json_data.get('address')
-    # phone_number = json_data.get('phonenumber')
     serializer = OrderSerializer(data=request.data)
     if serializer.is_valid():
         order = Order(
