@@ -1,7 +1,7 @@
 from django import forms
 from django.shortcuts import redirect, render
 from django.views import View
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.contrib.auth.decorators import user_passes_test
 import json
 from django.db.models import F, Sum
@@ -94,7 +94,10 @@ def view_restaurants(request):
 
 @user_passes_test(is_manager, login_url='restaurateur:login')
 def view_orders(request):
-    return render(request, template_name='order_items.html', context={
-        'order_items': Order.objects.annotate(
+    orders = Order.objects.annotate(
             total_cost=Sum(F('items__price') * F('items__quantity'))
-            ).order_by('-id').prefetch_related('items'),})
+            ).order_by('-id').prefetch_related('items')
+    for order in orders:
+        order.admin_change_url = reverse('admin:foodcartapp_order_change', args=(order.id,))
+    return render(request, template_name='order_items.html', context={
+        'order_items': orders,})
