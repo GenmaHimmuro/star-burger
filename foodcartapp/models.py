@@ -132,6 +132,10 @@ class Order(models.Model):
         ('DELIVERING', 'Передан курьеру'),
         ('DELIVERED', 'Доставлен'),
     ]
+    PAYMENT_METHOD = [
+        ('CASH', 'Наличными'),
+        ('ONLINE', 'Электронно'),
+    ]
     address = models.CharField(
         max_length=100,
         null=False,
@@ -179,6 +183,12 @@ class Order(models.Model):
         blank=True,
         verbose_name='Доставка в',
         db_index=True,
+    )
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHOD,
+        db_index=True,
+        verbose_name='Способ оплаты',
     )
 
     class Meta:
