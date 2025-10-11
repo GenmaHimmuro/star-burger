@@ -117,15 +117,41 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    inlines = [OrderItemInline, ]
+    inlines = [OrderItemInline]
+    list_display = [
+        'id',
+        'first_name',
+        'last_name',
+        'address',
+        'status',
+        'payment_method',
+        'suitable_restaurants_display',
+    ]
+    readonly_fields = ['suitable_restaurants_display']
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'restaurant':
+            order_id = request.resolver_match.kwargs.get('object_id')
+            if order_id:
+                order = Order.objects.get(id=order_id)
+                kwargs['queryset'] = order.get_suitable_restaurants()
+            else:
+                kwargs['queryset'] = Restaurant.objects.none()
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def suitable_restaurants_display(self, obj):
+        restaurants = obj.get_suitable_restaurants()
+        return ", ".join(restaurant.name for restaurant in restaurants)
+    suitable_restaurants_display.short_description = 'Подходящие рестораны'
 
     def response_post_save_change(self, request, obj):
-        res = super(OrderAdmin, self).response_post_save_change(request, obj)
-        if "next" in request.GET and url_has_allowed_host_and_scheme(url=request.GET['next'],
-                                                                     allowed_hosts=request.get_host()):
+        res = super().response_post_save_change(request, obj)
+        if "next" in request.GET and url_has_allowed_host_and_scheme(
+            url=request.GET['next'],
+            allowed_hosts={request.get_host()}
+        ):
             return HttpResponseRedirect(request.GET['next'])
-        else:
-            return res
+        return res
 
 
 @admin.register(OrderItem)

@@ -5,12 +5,10 @@ from django.urls import reverse_lazy, reverse
 from django.contrib.auth.decorators import user_passes_test
 import json
 from django.db.models import F, Sum
-
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import views as auth_views
 
-
-from foodcartapp.models import Product, Restaurant, Order, OrderItem
+from foodcartapp.models import Product, Restaurant, Order, OrderItem, RestaurantMenuItem
 
 
 class Login(forms.Form):
@@ -99,5 +97,7 @@ def view_orders(request):
             ).order_by('-id').prefetch_related('items')
     for order in orders:
         order.admin_change_url = reverse('admin:foodcartapp_order_change', args=(order.id,))
+        order.suitable_restaurants = order.get_suitable_restaurants()
+        order.selected_restaurant = order.restaurant
     return render(request, template_name='order_items.html', context={
         'order_items': orders,})

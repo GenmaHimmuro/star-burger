@@ -2,6 +2,7 @@ from django.db import models
 from django.core.validators import MinValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
 from django.utils import timezone
+from django.db.models import Count
 
 
 class Restaurant(models.Model):
@@ -109,7 +110,7 @@ class RestaurantMenuItem(models.Model):
         verbose_name='продукт',
     )
     availability = models.BooleanField(
-        'в продаже',
+        'в продаже', 
         default=True,
         db_index=True
     )
@@ -178,17 +179,27 @@ class Order(models.Model):
         blank=True,
         verbose_name='Звонок в',
         db_index=True,
+        null=True,
     )
     delivered_at = models.DateTimeField(
         blank=True,
         verbose_name='Доставка в',
         db_index=True,
+        null=True,
     )
     payment_method = models.CharField(
         max_length=20,
         choices=PAYMENT_METHOD,
         db_index=True,
         verbose_name='Способ оплаты',
+    )
+    restaurant = models.ForeignKey(
+        Restaurant,
+        on_delete=models.CASCADE,
+        related_name='orders',
+        verbose_name='Ресторан',
+        blank=True,
+        null=True,
     )
 
     class Meta:
@@ -197,6 +208,19 @@ class Order(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} - {self.address}"
+    
+    def get_suitable_restaurants(self):
+        product_ids = self.items.values_list('product_id', flat=True)
+        product_count = len(product_ids)
+        
+        restaurants = (
+            Restaurant.objects
+            .filter(menu_items__product_id__in=product_ids, menu_items__availability=True)
+            .annotate(available_products=Count('menu_items__product_id', distinct=True))
+            .filter(available_products=product_count)
+            .distinct()
+        )
+        return restaurants
 
 
 class OrderItem(models.Model):

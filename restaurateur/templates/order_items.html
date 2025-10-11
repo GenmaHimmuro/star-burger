@@ -4,6 +4,11 @@
 
 {% block content %}
 {% load admin_urls %}
+<style>
+  summary {
+    cursor: pointer;
+  }
+</style>
   <center>
     <h2>Необработанные заказы</h2>
   </center>
@@ -22,6 +27,7 @@
       <th>Телефон</th>
       <th>Адрес доставки</th>
       <th>Комментарий</th>
+      <th>Рестораны</th>
       <th>Ссылка на админку</th>
     </tr>
 
@@ -35,6 +41,19 @@
         <td>{{ item.phone_number }}</td>
         <td>{{ item.address }}</td>
         <td>{{ item.comment }}</td>
+        <td>
+          {% if item.selected_restaurant %}
+            <p><b>Готовит</b></p>
+            {{ item.selected_restaurant.name }}
+          {% else %}
+          <details>
+            {% if item.suitable_restaurants %}
+              <summary><p><b>Могут быть приготовлены ресторанами</b></p></summary>
+              {{ item.suitable_restaurants|join:", " }}
+            {% endif %}
+          </details>
+          {% endif %}
+        </td>
         <td><a href="{% url 'admin:foodcartapp_order_change' item.id %}?next={{ request.path|urlencode }}">Редактировать заказ</a></td>
       </tr>
     {% endfor %}

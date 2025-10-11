@@ -80,7 +80,7 @@ def register_order(request):
             product = Product.objects.get(id=product_data['product'])
             OrderItem.objects.create(
                 order=order,
-                product_id=product,
+                product_id=product.id,
                 quantity=product_data['quantity'],
                 price=product.price,
             )
