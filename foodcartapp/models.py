@@ -125,6 +125,12 @@ class RestaurantMenuItem(models.Model):
 
 
 class Order(models.Model):
+    STATUS_ORDER = [
+        ('ACCEPTED', 'Принят'),
+        ('PREPARING', 'Готовится'),
+        ('DELIVERING', 'Передан курьеру'),
+        ('DELIVERED', 'Доставлен'),
+    ]
     address = models.CharField(
         max_length=100,
         null=False,
@@ -145,7 +151,13 @@ class Order(models.Model):
         verbose_name='Мобильный номер',
         null=False,
     )
-
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_ORDER,
+        default='ACCEPTED',
+        verbose_name='Статус заказа',
+        db_index=True,
+    )
     class Meta:
         verbose_name = 'заказ'
         verbose_name_plural = 'заказы'
