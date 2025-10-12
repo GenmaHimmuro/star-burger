@@ -84,10 +84,12 @@ def register_order(request):
                 quantity=product_data['quantity'],
                 price=product.price,
             )
-        return Response(
-            OrderResponseSerializer(order).data,
-            status=status.HTTP_201_CREATED
-        )
+
+        suitable_restaurants = order.get_suitable_restaurants()
+        response_data = OrderResponseSerializer(order).data
+        response_data['suitable_restaurants'] = [{'id': r.id, 'name': r.name, 'address': r.address} for r in suitable_restaurants]
+        
+        return Response(response_data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

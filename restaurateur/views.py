@@ -7,10 +7,14 @@ import json
 from django.db.models import F, Sum
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import views as auth_views
+from geopy import distance
+import logging
 
 from foodcartapp.models import Product, Restaurant, Order, OrderItem, RestaurantMenuItem
+from foodcartapp.yandex_geocoder.geocoder import fetch_coordinates
 
 
+logger = logging.getLogger(__name__)
 class Login(forms.Form):
     username = forms.CharField(
         label='Логин', max_length=75, required=True,
@@ -90,14 +94,60 @@ def view_restaurants(request):
     })
 
 
+def get_address_coords(address):
+    coords = fetch_coordinates(address)
+    if coords:
+        lon, lat = coords
+        return (lat, lon)
+    return None
+
+
+def get_restaurant_coords(restaurant):
+    if restaurant.latitude is not None and restaurant.longitude is not None:
+        return (restaurant.latitude, restaurant.longitude)
+    else:
+        coords = fetch_coordinates(restaurant.address)
+        if coords:
+            lon, lat = coords
+            restaurant.latitude = lat
+            restaurant.longitude = lon
+            restaurant.save()
+            return (lat, lon)
+        return None
+
+
 @user_passes_test(is_manager, login_url='restaurateur:login')
 def view_orders(request):
     orders = Order.objects.annotate(
-            total_cost=Sum(F('items__price') * F('items__quantity'))
-            ).order_by('-id').prefetch_related('items')
+        total_cost=Sum(F('items__price') * F('items__quantity'))
+    ).order_by('-id').prefetch_related('items').select_related('restaurant')
+    
     for order in orders:
         order.admin_change_url = reverse('admin:foodcartapp_order_change', args=(order.id,))
-        order.suitable_restaurants = order.get_suitable_restaurants()
+        order.suitable_restaurants = list(order.get_suitable_restaurants())
         order.selected_restaurant = order.restaurant
-    return render(request, template_name='order_items.html', context={
-        'order_items': orders,})
+        order.order_address = order.address
+        order.restaurant_address = order.restaurant.address if order.restaurant else None
+        
+        order.distance = None
+        coordinates_order = get_address_coords(order.order_address)
+        
+        if order.restaurant:
+            coordinates_restaurant = get_restaurant_coords(order.restaurant)
+            if coordinates_order and coordinates_restaurant:
+                order.distance = round(distance.distance(coordinates_order, coordinates_restaurant).km, 3)
+        
+        for restaurant in order.suitable_restaurants:
+                coordinates_restaurant = get_restaurant_coords(restaurant)
+                if coordinates_order and coordinates_restaurant:
+                    restaurant.distance = round(distance.distance(coordinates_order, coordinates_restaurant).km, 3)
+                else:
+                    restaurant.distance = None
+        
+        order.suitable_restaurants.sort(key=lambda r: r.distance if r.distance is not None else float('inf'))
+    
+    return render(
+        request,
+        template_name='order_items.html',
+        context={'order_items': orders}
+    )

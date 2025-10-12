@@ -12,10 +12,7 @@
   <center>
     <h2>Необработанные заказы</h2>
   </center>
-
-  <hr/>
-  <br/>
-  <br/>
+  <hr/><br/><br/>
   <div class="container">
    <table class="table table-responsive">
     <tr>
@@ -30,13 +27,12 @@
       <th>Рестораны</th>
       <th>Ссылка на админку</th>
     </tr>
-
     {% for item in order_items %}
       <tr>
         <td>{{ item.id }}</td>
         <td>{{ item.get_status_display }}</td>
         <td>{{ item.get_payment_method_display }}</td>
-        <td>{{ item.total_cost }}</td>
+        <td>{{ item.total_cost|floatformat:2 }} руб.</td>
         <td>{{ item.first_name }} {{ item.last_name }}</td>
         <td>{{ item.phone_number }}</td>
         <td>{{ item.address }}</td>
@@ -49,7 +45,16 @@
           <details>
             {% if item.suitable_restaurants %}
               <summary><p><b>Могут быть приготовлены ресторанами</b></p></summary>
-              {{ item.suitable_restaurants|join:", " }}
+              {% for restaurant in item.suitable_restaurants %}
+                {{ restaurant.name }}
+                {% if restaurant.distance %}
+                  - {{ restaurant.distance }} км
+                {% else %}
+                  - Расстояние не рассчитано
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <p>Нет доступных ресторанов</p>
             {% endif %}
           </details>
           {% endif %}

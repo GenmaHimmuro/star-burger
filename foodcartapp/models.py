@@ -20,6 +20,20 @@ class Restaurant(models.Model):
         max_length=50,
         blank=True,
     )
+    latitude = models.DecimalField(
+        'широта',
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    longitude = models.DecimalField(
+        'долгота',
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = 'ресторан'
@@ -210,14 +224,10 @@ class Order(models.Model):
         return f"{self.first_name} {self.last_name} - {self.address}"
     
     def get_suitable_restaurants(self):
-        product_ids = self.items.values_list('product_id', flat=True)
-        product_count = len(product_ids)
-        
+        product_ids = self.items.values_list('product_id', flat=True).distinct()
         restaurants = (
             Restaurant.objects
             .filter(menu_items__product_id__in=product_ids, menu_items__availability=True)
-            .annotate(available_products=Count('menu_items__product_id', distinct=True))
-            .filter(available_products=product_count)
             .distinct()
         )
         return restaurants
