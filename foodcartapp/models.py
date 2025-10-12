@@ -2,7 +2,6 @@ from django.db import models
 from django.core.validators import MinValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
 from django.utils import timezone
-from django.db.models import Count
 
 
 class Restaurant(models.Model):
@@ -18,20 +17,6 @@ class Restaurant(models.Model):
     contact_phone = models.CharField(
         'контактный телефон',
         max_length=50,
-        blank=True,
-    )
-    latitude = models.DecimalField(
-        'широта',
-        max_digits=9,
-        decimal_places=6,
-        null=True,
-        blank=True,
-    )
-    longitude = models.DecimalField(
-        'долгота',
-        max_digits=9,
-        decimal_places=6,
-        null=True,
         blank=True,
     )
 
@@ -256,6 +241,11 @@ class OrderItem(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(0)],
     )
+
+    def save(self, *args, **kwargs):
+        if not self.price and self.product:
+            self.price = self.product.price
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'элемент заказа'

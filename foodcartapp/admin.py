@@ -125,9 +125,7 @@ class OrderAdmin(admin.ModelAdmin):
         'address',
         'status',
         'payment_method',
-        'suitable_restaurants_display',
     ]
-    readonly_fields = ['suitable_restaurants_display']
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'restaurant':
@@ -138,11 +136,6 @@ class OrderAdmin(admin.ModelAdmin):
             else:
                 kwargs['queryset'] = Restaurant.objects.none()
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-    def suitable_restaurants_display(self, obj):
-        restaurants = obj.get_suitable_restaurants()
-        return ", ".join(restaurant.name for restaurant in restaurants)
-    suitable_restaurants_display.short_description = 'Подходящие рестораны'
 
     def response_post_save_change(self, request, obj):
         res = super().response_post_save_change(request, obj)
