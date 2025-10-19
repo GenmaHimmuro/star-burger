@@ -1,4 +1,5 @@
 from django.db import models
+from collections import defaultdict
 from django.core.validators import MinValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
 from django.utils import timezone
@@ -125,8 +126,37 @@ class RestaurantMenuItem(models.Model):
         return f"{self.restaurant.name} - {self.product.name}"
 
 
+class OrderQuerySet(models.QuerySet):
+    def with_suitable_restaurants(self):
+        menu_items = RestaurantMenuItem.objects.filter(availability=True).select_related('restaurant', 'product')
+        
+        restaurant_products = defaultdict(set)
+        for item in menu_items:
+            restaurant_products[item.restaurant].add(item.product)
+
+        orders = list(self.prefetch_related('items__product'))
+        
+        for order in orders:
+            order_products = set()
+            for item in order.items.all():
+                order_products.add(item.product.id)
+            
+            suitable_restaurants = []
+            for restaurant in restaurant_products:
+                restaurant_product_ids = set()
+                for product in restaurant_products[restaurant]:
+                    restaurant_product_ids.add(product.id)
+                
+                if order_products & restaurant_product_ids:
+                    suitable_restaurants.append(restaurant)
+            
+            order.suitable_restaurants = suitable_restaurants
+        return orders
+
+
 class Order(models.Model):
     STATUS_ORDER = [
+        ('UNPROCESSED', 'Необработано'),
         ('ACCEPTED', 'Принят'),
         ('PREPARING', 'Готовится'),
         ('DELIVERING', 'Передан курьеру'),
@@ -138,28 +168,25 @@ class Order(models.Model):
     ]
     address = models.CharField(
         max_length=100,
-        null=False,
         verbose_name='Адрес',
     )
     first_name = models.CharField(
         verbose_name='Имя',
         max_length=50,
-        null=False,
     )
     last_name = models.CharField(
         verbose_name='Фамилия',
         max_length=50,
-        null=False,
     )
     phone_number = PhoneNumberField(
         region='RU',
         verbose_name='Мобильный номер',
-        null=False,
+        db_index=True,
     )
     status = models.CharField(
         max_length=20,
         choices=STATUS_ORDER,
-        default='ACCEPTED',
+        default='UNPROCESSED',
         verbose_name='Статус заказа',
         db_index=True,
     )
@@ -194,12 +221,13 @@ class Order(models.Model):
     )
     restaurant = models.ForeignKey(
         Restaurant,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name='orders',
         verbose_name='Ресторан',
         blank=True,
         null=True,
     )
+    objects = OrderQuerySet.as_manager()
 
     class Meta:
         verbose_name = 'заказ'
@@ -241,11 +269,6 @@ class OrderItem(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(0)],
     )
-
-    def save(self, *args, **kwargs):
-        if not self.price and self.product:
-            self.price = self.product.price
-        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'элемент заказа'

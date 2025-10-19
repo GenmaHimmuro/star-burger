@@ -8,7 +8,7 @@ from django.contrib.auth import authenticate, login, views as auth_views
 from geopy import distance
 
 from foodcartapp.models import Product, Restaurant, Order
-from utils import get_address_coords, get_restaurant_coords
+from place_coord.get_coord import get_all_coordinates
 
 
 class Login(forms.Form):
@@ -92,33 +92,54 @@ def view_restaurants(request):
 
 @user_passes_test(is_manager, login_url='restaurateur:login')
 def view_orders(request):
-    orders = Order.objects.annotate(
+    orders = Order.objects.exclude(status='DELIVERED').annotate(
         total_cost=Sum(F('items__price') * F('items__quantity'))
-    ).order_by('-id').prefetch_related('items').select_related('restaurant')
-    
+    ).order_by('-id').prefetch_related('items', 'items__product').select_related('restaurant').with_suitable_restaurants()
+
+    order_addresses = []
+    restaurant_addresses = []
     for order in orders:
+        order_addresses.append(order.address)
+        for restaurant in order.suitable_restaurants:
+            restaurant_addresses.append(restaurant.address)
+        if order.restaurant:
+            restaurant_addresses.append(order.restaurant.address)
+        
         order.admin_change_url = reverse('admin:foodcartapp_order_change', args=(order.id,))
-        order.suitable_restaurants = list(order.get_suitable_restaurants())
         order.selected_restaurant = order.restaurant
         order.order_address = order.address
-        order.restaurant_address = order.restaurant.address if order.restaurant else None
-        
+        if order.restaurant:
+            order.restaurant_address = order.restaurant.address
+        else:
+            order.restaurant_address = None
+
+    coords_map = get_all_coordinates(order_addresses, restaurant_addresses)
+
+    for order in orders:
+        order_coords = coords_map.get(order.address)
         order.distance = None
-        coordinates_order = get_address_coords(order.order_address)
-        if order.restaurant and coordinates_order:
-            coordinates_restaurant = get_restaurant_coords(order.restaurant)
-            if coordinates_restaurant:
-                order.distance = round(distance.distance(coordinates_order, coordinates_restaurant).km, 3)
+        order.order_address_error = None
+
+        if not order_coords:
+            order.order_address_error = "Адрес не найден"
         
+        if order.restaurant:
+            if order_coords and order.restaurant_address in coords_map:
+                restaurant_coords = coords_map.get(order.restaurant_address)
+                if restaurant_coords:
+                    distance_km = distance.distance(order_coords, restaurant_coords).km
+                    order.distance = round(distance_km, 3)
+
         for restaurant in order.suitable_restaurants:
             restaurant.distance = None
-            if coordinates_order:
-                coordinates_restaurant = get_restaurant_coords(restaurant)
-                if coordinates_restaurant:
-                    restaurant.distance = round(distance.distance(coordinates_order, coordinates_restaurant).km, 3)
-        
+            if order_coords and restaurant.address in coords_map:
+                restaurant_coords = coords_map.get(restaurant.address)
+                if restaurant_coords:
+                    distance_km = distance.distance(order_coords, restaurant_coords).km
+                    restaurant.distance = round(distance_km, 3)
+
         order.suitable_restaurants.sort(key=lambda r: r.distance if r.distance is not None else float('inf'))
-    
+
     return render(
         request,
         template_name='order_items.html',

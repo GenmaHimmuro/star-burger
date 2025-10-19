@@ -5,12 +5,10 @@ from rest_framework.decorators import api_view
 from rest_framework import serializers
 from rest_framework import status
 from django.db import transaction
-from geopy import distance
 
 from .models import Product
 from .models import Order
 from .models import OrderItem
-from utils import get_address_coords
 
 
 def banners_list_api(request):
@@ -87,32 +85,7 @@ def register_order(request):
                 price=product.price,
             )
         
-        suitable_restaurants = order.get_suitable_restaurants()
-        coordinates_order = get_address_coords(order.address)
-        
-        for restaurant in suitable_restaurants:
-            restaurant.distance = None
-            if coordinates_order:
-                coordinates_restaurant = get_address_coords(restaurant.address)
-                if coordinates_restaurant:
-                    restaurant.distance = round(distance.distance(coordinates_order, coordinates_restaurant).km, 3)
-        
-        suitable_restaurants = sorted(
-            suitable_restaurants,
-            key=lambda r: r.distance if r.distance is not None else float('inf')
-        )
-        
-        response_data = OrderResponseSerializer(order).data
-        response_data['suitable_restaurants'] = [
-            {
-                'id': r.id,
-                'name': r.name,
-                'address': r.address,
-                'distance': r.distance
-            } for r in suitable_restaurants
-        ]
-        
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        return Response(OrderResponseSerializer(order).data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

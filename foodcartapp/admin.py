@@ -138,13 +138,13 @@ class OrderAdmin(admin.ModelAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def response_post_save_change(self, request, obj):
-        res = super().response_post_save_change(request, obj)
+        response = super().response_post_save_change(request, obj)
         if "next" in request.GET and url_has_allowed_host_and_scheme(
             url=request.GET['next'],
             allowed_hosts={request.get_host()}
         ):
             return HttpResponseRedirect(request.GET['next'])
-        return res
+        return response
 
 
 @admin.register(OrderItem)
