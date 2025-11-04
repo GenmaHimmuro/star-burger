@@ -2,13 +2,18 @@ from place_coord.models import Place
 from place_coord.geocoder import fetch_coordinates
 
 
-def get_all_coordinates(order_addresses, restaurant_addresses):
-    all_addresses = set(order_addresses) | set(restaurant_addresses)
-    places = Place.objects.filter(address__in=all_addresses)
-    coords_map = {place.address: (place.lat, place.lon) for place in places if place.lat and place.lon}
-    missing_addresses = all_addresses - set(coords_map.keys())
+def get_all_coordinates(all_addresses):
+    addresses_set = set(all_addresses)
+    places = Place.objects.filter(address__in=addresses_set)
 
-    for address in missing_addresses:
+    coords_map = {
+        p.address: (p.lat, p.lon)
+        for p in places
+        if p.lat is not None and p.lon is not None
+    }
+    missing = addresses_set - coords_map.keys()
+
+    for address in missing:
         coords = fetch_coordinates(address)
         if coords:
             lon, lat = coords

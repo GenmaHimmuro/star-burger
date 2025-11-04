@@ -46,28 +46,28 @@
           {% if item.selected_restaurant %}
             <p><b>Готовит</b></p>
             {{ item.selected_restaurant.name }}
-            {% if item.distance %}
-              - {{ item.distance }} км
+            {% if item.selected_restaurant_distance %}
+              - {{ item.selected_restaurant_distance }} км
             {% else %}
               - Расстояние не рассчитано
             {% endif %}
           {% else %}
-          <details>
-            {% if item.suitable_restaurants %}
-              <summary><p><b>Могут быть приготовлены ресторанами</b></p></summary>
-              {% for restaurant in item.suitable_restaurants %}
-                {{ restaurant.name }}
-                {% if restaurant.distance %}
-                  - {{ restaurant.distance }} км
-                {% else %}
-                  - Расстояние не рассчитано
-                {% endif %}
-                <br>
-              {% endfor %}
-            {% else %}
-              <p>Нет доступных ресторанов</p>
-            {% endif %}
-          </details>
+            <details>
+              {% if item.suitable_restaurants %}
+                <summary><p><b>Могут быть приготовлены ресторанами</b></p></summary>
+                {% for restaurant in item.suitable_restaurants %}
+                  {{ restaurant.name }}
+                  {% if restaurant.distance %}
+                    - {{ restaurant.distance }} км
+                  {% else %}
+                    - Расстояние не рассчитано
+                  {% endif %}
+                  <br>
+                {% endfor %}
+              {% else %}
+                <p>Нет доступных ресторанов</p>
+              {% endif %}
+            </details>
           {% endif %}
         </td>
         <td><a href="{% url 'admin:foodcartapp_order_change' item.id %}?next={{ request.path|urlencode }}">Редактировать заказ</a></td>

@@ -134,7 +134,7 @@ class OrderQuerySet(models.QuerySet):
         for item in menu_items:
             restaurant_products[item.restaurant].add(item.product)
 
-        orders = list(self.prefetch_related('items__product'))
+        orders = self.prefetch_related('items__product')
         
         for order in orders:
             order_products = set()

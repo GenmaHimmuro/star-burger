@@ -92,56 +92,53 @@ def view_restaurants(request):
 
 @user_passes_test(is_manager, login_url='restaurateur:login')
 def view_orders(request):
-    orders = Order.objects.exclude(status='DELIVERED').annotate(
-        total_cost=Sum(F('items__price') * F('items__quantity'))
-    ).order_by('-id').prefetch_related('items', 'items__product').select_related('restaurant').with_suitable_restaurants()
+    orders = (
+        Order.objects.exclude(status='DELIVERED')
+        .annotate(total_cost=Sum(F('items__price') * F('items__quantity')))
+        .order_by('-id')
+        .prefetch_related('items', 'items__product')
+        .select_related('restaurant')
+        .with_suitable_restaurants()
+    )
 
-    order_addresses = []
-    restaurant_addresses = []
+    addresses = {
+        order.address for order in orders
+    } | {
+        order.restaurant.address for order in orders if order.restaurant
+    } | {
+        r.address for order in orders for r in order.suitable_restaurants
+    }
+
+    coords_map = get_all_coordinates(addresses)
+
     for order in orders:
-        order_addresses.append(order.address)
-        for restaurant in order.suitable_restaurants:
-            restaurant_addresses.append(restaurant.address)
-        if order.restaurant:
-            restaurant_addresses.append(order.restaurant.address)
-        
-        order.admin_change_url = reverse('admin:foodcartapp_order_change', args=(order.id,))
         order.selected_restaurant = order.restaurant
-        order.order_address = order.address
-        if order.restaurant:
-            order.restaurant_address = order.restaurant.address
-        else:
-            order.restaurant_address = None
-
-    coords_map = get_all_coordinates(order_addresses, restaurant_addresses)
-
-    for order in orders:
-        order_coords = coords_map.get(order.address)
-        order.distance = None
+        order.selected_restaurant_distance = None
         order.order_address_error = None
 
-        if not order_coords:
+        if not (order_coords := coords_map.get(order.address)):
             order.order_address_error = "Адрес не найден"
-        
-        if order.restaurant:
-            if order_coords and order.restaurant_address in coords_map:
-                restaurant_coords = coords_map.get(order.restaurant_address)
-                if restaurant_coords:
-                    distance_km = distance.distance(order_coords, restaurant_coords).km
-                    order.distance = round(distance_km, 3)
+            continue
 
-        for restaurant in order.suitable_restaurants:
-            restaurant.distance = None
-            if order_coords and restaurant.address in coords_map:
-                restaurant_coords = coords_map.get(restaurant.address)
-                if restaurant_coords:
-                    distance_km = distance.distance(order_coords, restaurant_coords).km
-                    restaurant.distance = round(distance_km, 3)
+        if order.restaurant and (r_coords := coords_map.get(order.restaurant.address)):
+            order.selected_restaurant_distance = round(
+                distance.distance(order_coords, r_coords).km, 3
+            )
 
-        order.suitable_restaurants.sort(key=lambda r: r.distance if r.distance is not None else float('inf'))
+        suitable = [
+            r for r in order.suitable_restaurants
+            if not order.restaurant or r.id != order.restaurant.id
+        ]
 
-    return render(
-        request,
-        template_name='order_items.html',
-        context={'order_items': orders}
-    )
+        for r in suitable:
+            if r_coords := coords_map.get(r.address):
+                r.distance = round(distance.distance(order_coords, r_coords).km, 3)
+            else:
+                r.distance = None
+
+        order.suitable_restaurants = sorted(
+            suitable,
+            key=lambda r: r.distance if r.distance is not None else float('inf')
+        )
+
+    return render(request, 'order_items.html', {'order_items': orders})
