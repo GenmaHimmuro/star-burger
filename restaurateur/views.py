@@ -101,13 +101,11 @@ def view_orders(request):
         .with_suitable_restaurants()
     )
 
-    addresses = {
-        order.address for order in orders
-    } | {
-        order.restaurant.address for order in orders if order.restaurant
-    } | {
-        r.address for order in orders for r in order.suitable_restaurants
-    }
+    addresses = (
+        {order.address for order in orders} |
+        {order.restaurant.address for order in orders if order.restaurant} |
+        {r.address for order in orders for r in order.suitable_restaurants}
+    )
 
     coords_map = get_all_coordinates(addresses)
 
@@ -116,29 +114,35 @@ def view_orders(request):
         order.selected_restaurant_distance = None
         order.order_address_error = None
 
-        if not (order_coords := coords_map.get(order.address)):
+        order_coords = coords_map.get(order.address)
+        if not order_coords:
             order.order_address_error = "Адрес не найден"
+            order.suitable_restaurants_with_distance = []
             continue
 
-        if order.restaurant and (r_coords := coords_map.get(order.restaurant.address)):
+        if order.restaurant and (rest_coords := coords_map.get(order.restaurant.address)):
             order.selected_restaurant_distance = round(
-                distance.distance(order_coords, r_coords).km, 3
+                distance.distance(order_coords, rest_coords).km, 3
             )
 
         suitable = [
-            r for r in order.suitable_restaurants
-            if not order.restaurant or r.id != order.restaurant.id
+            rest for rest in order.suitable_restaurants
+            if not order.restaurant or rest.id != order.restaurant.id
         ]
 
-        for r in suitable:
-            if r_coords := coords_map.get(r.address):
-                r.distance = round(distance.distance(order_coords, r_coords).km, 3)
-            else:
-                r.distance = None
+        suitable_with_distance = []
+        for rest in suitable:
+            r_coords = coords_map.get(rest.address)
+            dist = round(distance.distance(order_coords, r_coords).km, 3) if r_coords else None
+            suitable_with_distance.append({
+                'restaurant': rest,
+                'distance': dist
+            })
 
-        order.suitable_restaurants = sorted(
-            suitable,
-            key=lambda r: r.distance if r.distance is not None else float('inf')
+        suitable_with_distance.sort(
+            key=lambda x: x['distance'] if x['distance'] is not None else float('inf')
         )
+
+        order.suitable_restaurants_with_distance = suitable_with_distance
 
     return render(request, 'order_items.html', {'order_items': orders})

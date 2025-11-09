@@ -53,12 +53,12 @@
             {% endif %}
           {% else %}
             <details>
-              {% if item.suitable_restaurants %}
+              {% if item.suitable_restaurants_with_distance %}
                 <summary><p><b>Могут быть приготовлены ресторанами</b></p></summary>
-                {% for restaurant in item.suitable_restaurants %}
-                  {{ restaurant.name }}
-                  {% if restaurant.distance %}
-                    - {{ restaurant.distance }} км
+                {% for rd in item.suitable_restaurants_with_distance %}
+                  {{ rd.restaurant.name }}
+                  {% if rd.distance %}
+                    - {{ rd.distance }} км
                   {% else %}
                     - Расстояние не рассчитано
                   {% endif %}
