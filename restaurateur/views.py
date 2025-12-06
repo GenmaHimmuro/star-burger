@@ -146,3 +146,11 @@ def view_orders(request):
         order.suitable_restaurants_with_distance = suitable_with_distance
 
     return render(request, 'order_items.html', {'order_items': orders})
+
+
+
+from django.http import HttpResponse
+def index(request):
+    a = None
+    a.hello() # Creating an error with an invalid line of code
+    return HttpResponse("Hello, world. You're at the pollapp index.")
